@@ -1,10 +1,27 @@
 const express = require('express');
+const app = express()
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const passport = require("passport");
+const bodyparser = require('body-parser')
+const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
 const { pool } = require("../database/dbConfig");
 const {verifyToken} = require('../controller/authController')
+
+// middleware
+app.use(
+    session({
+        secret: 'secret',
+        resave: false,
+        saveUninitialized: false,
+        store: new pgSession({
+            pool,
+            tableName: 'sessions',
+        }),
+    })
+);
 
 router.post("/login", passport.authenticate('local'), (req, res) => {
     const user = req.user;
@@ -54,12 +71,12 @@ router.post("/register", async (req, res) => {
         password,
         password2
     } = req.body;
-    console.log({
+    /*console.log({
         name,
         email,
         password,
         password2
-    });
+    });*/
 
     let errors = [];
 
@@ -79,7 +96,7 @@ router.post("/register", async (req, res) => {
         res.status(400).json({ errors });
     } else {
         let hashedPassword = (await bcrypt.hash(password, 10)).toString();
-        console.log(hashedPassword)
+        //console.log(hashedPassword)
 
         pool.query(
             `SELECT * FROM users
@@ -89,7 +106,7 @@ router.post("/register", async (req, res) => {
                 if (err) {
                     throw err
                 }
-                console.log(results.rows);
+                //console.log(results.rows);
 
                 if (results.rows.length > 0) {
                     errors.push({ message: "Email already registered" });
@@ -108,7 +125,7 @@ router.post("/register", async (req, res) => {
                                 throw err
                             }
                             res.send({ message: "Successfully registered user" });
-                            console.log(results.rows);
+                            //console.log(results.rows);
                         }
                     )
                 }
@@ -151,7 +168,7 @@ router.post("/check-email", (req, res) => {
                 throw err;
             }
 
-            console.log(results.rows);
+            //console.log(results.rows);
 
             if (results.rows.length > 0) {
                 res.status(200).send({ message: "Email exists in database" });
