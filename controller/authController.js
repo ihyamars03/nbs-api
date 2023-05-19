@@ -2,24 +2,9 @@ const express = require('express')
 const app = express()
 const passport = require("passport");
 const session = require('express-session');
-const pgSession = require('connect-pg-simple')(session);
 const store = session.MemoryStore();
-const { pool } = require("../database/dbConfig");
 const initializePassport = require("../config/passportConfig");
 
-// middleware
-app.use(express.json());
-app.use(
-    session({
-        secret: 'secret',
-        resave: false,
-        saveUninitialized: false,
-        store: new pgSession({
-            pool,
-            tableName: 'sessions',
-        }),
-    })
-);
 
 initializePassport(passport);
 
