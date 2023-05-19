@@ -1,6 +1,8 @@
 const express = require('express');
 const app = express();
+const router = express.Router()
 const { pool } = require("../database/dbConfig");
+const router = require('./attend');
 
 const PORT = process.env.PORT || 4000;
 
@@ -12,7 +14,7 @@ app.use(express.json());
   res.send('Hello, world!');
 });*/
 // Menangani permintaan GET pada URL /api/employees
-app.get('/api/employees', (req, res) => {
+router.get('/employees', (req, res) => {
   const { name, divisi } = req.query;
   let query = 'SELECT * FROM employees';
 
@@ -53,7 +55,7 @@ app.get('/api/employees', (req, res) => {
   res.send('Data ditambahkan melalui API POST');
 });*/
 
-app.post('/api/employees', (req, res) => {
+router.post('/employees', (req, res) => {
   let {
     name,
     position,
@@ -131,7 +133,7 @@ app.post('/api/employees', (req, res) => {
   }
 });
 
-app.delete('/api/employees/:id', (req, res) => {
+router.delete('/employees/:id', (req, res) => {
   const id = req.params.id;
 
   pool.query(
@@ -152,8 +154,4 @@ app.delete('/api/employees/:id', (req, res) => {
   );
 });
 
-
-// Menjalankan server
-app.listen(PORT, () => {
-  console.log(`Server berjalan di port ${PORT}`);
-});
+module.exports = router
