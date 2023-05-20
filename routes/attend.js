@@ -1,63 +1,85 @@
 const express = require('express')
 const router = express.Router()
-const Multer = require('multer');
-const { Storage } = require('@google-cloud/storage');
+const {Attendance} = require('../model/attendModel')
 
-const app = express();
-
-// Konfigurasi Google Cloud Storage
-const storage = new Storage({
-  projectId: 'nbs-company-386604',
-  keyFilename: '../credentials/key.json',
-});
-
-const bucketName = 'nbs-bucket';
-
-// Konfigurasi Multer untuk mengunggah file
-const multer = Multer({
-  storage: Multer.memoryStorage(),
-  limits: {
-    fileSize: 5 * 1024 * 1024, // Batasan ukuran file (5MB)
-  },
-});
 
 // Endpoint untuk mengunggah file
-router.post('/attend', multer.single('file'), async (req, res) => {
-  try {
-    const file = req.file;
+router.post('/clockin:employeeId', async (req, res) => {
+ try {
+  const dateObject = new Date();
+  const {employeeId} = req.body
 
-    if (!file) {
-      res.status(400).json({ message: 'No file uploaded' });
-      return;
-    }
+  let date = ("0" + dateObject.getDate()).slice(-2);
+  let month = ("0" + (dateObject.getMonth() + 1)).slice(-2);
+  let year = dateObject.getFullYear();
 
-    const bucket = storage.bucket(bucketName);
+  let hours = dateObject.getHours(); 
+  let minutes = dateObject.getMinutes() > 9 ? dateObject.getMinutes() : '0'+dateObject.getMinutes();
 
-    const fileName = `${Date.now()}_${file.originalname}`;
-    const blob = bucket.file(fileName);
+  
+  let fraud = true
+  
+  if (!fraud) { res.status(400).json({message: 'Gambar bukan berupa wajah'})}
 
-    const blobStream = blob.createWriteStream({
-      resumable: false,
-      gzip: true,
-    });
+  
+  const attendance = await Attendance.create({
+    employee_id: employeeId,
+    attendance_date: `${date}/${month}/${year}`,
+    clockin_time: `${hours}:${minutes}`,
+    clockout_time: "00:00",
+    status: parseInt(clockin_time.split(':')[0]) <= 8 ? 'ontime' : 'late'
+  });
 
-    blobStream.on('error', (error) => {
-      console.error(error);
-      res.status(500).json({ message: 'Failed to upload file' });
-    });
+  res.status(200).json(attendance)
 
-    blobStream.on('finish', () => {
-      const publicUrl = `https://storage.googleapis.com/${bucketName}/${blob.name}`;
-      res.json({ message: 'File uploaded successfully', url: publicUrl });
-    });
-
-    blobStream.end(file.buffer);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Internal Server Error' });
-  }
+ } catch (error) {
+  res.status(500).json({ message: 'Internal server error', error: error });
+ }
   
 });
+
+router.put('/clockout:employeeId', async (req, res) => {
+  try {
+    const dateObject = new Date();
+    let hours = dateObject.getHours(); 
+    let minutes = dateObject.getMinutes() > 9 ? dateObject.getMinutes() : '0'+dateObject.getMinutes();
+
+    const {employeeId} = req.body;
+    const attendance = await Attendance.findAll(
+      {
+        where: {
+          employeeId: employeeId
+        }
+      }
+    );
+
+    if (!attendance) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    attendance.clockout_time = `${hours}:${minutes}`;
+    await attendance.save();
+
+    res.status(200).json(attendance);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/history:employeeId', async (res,req) => {
+  try {
+    const {employeeId} = req.body;
+    const attendance = await Attendance.findAll(
+      {
+        where: {
+          employeeId: employeeId
+        }
+      }
+    );
+    res.status(200).json(attendance)
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+})
 
 
 module.exports = router

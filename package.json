@@ -23,7 +23,9 @@
     "passport": "^0.6.0",
     "passport-local": "^1.0.0",
     "pg": "^8.10.0",
-    "redis": "^4.6.6"
+    "redis": "^4.6.6",
+    "sequelize": "^6.31.1",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"

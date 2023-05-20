@@ -2,7 +2,6 @@ const express = require('express');
 const app = express();
 const router = express.Router()
 const { pool } = require("../database/dbConfig");
-const router = require('./attend');
 
 const PORT = process.env.PORT || 4000;
 
