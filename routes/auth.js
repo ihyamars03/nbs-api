@@ -1,52 +1,93 @@
 const express = require('express');
-const app = express()
+const app = express();
+const { pool } = require("../database/dbConfig");
 const router = express.Router();
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const passport = require("passport");
-const bodyparser = require('body-parser')
 const session = require('express-session');
+const jwt = require('jsonwebtoken'); 
+const passport = require("passport");
 const pgSession = require('connect-pg-simple')(session);
-const { pool } = require("../database/dbConfig");
-const {verifyToken} = require('../controller/authController')
 
 // middleware
-app.use(
-    session({
-        secret: 'secret',
-        resave: false,
-        saveUninitialized: false,
-        store: new pgSession({
-            pool,
-            tableName: 'sessions',
-        }),
-    })
-);
+app.use(session({
+    secret: 'secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: false, 
+    store: new pgSession({
+        pool,
+        tableName: 'sessions',
+    }),
+}));
 
-router.post("/login", passport.authenticate('local'), (req, res) => {
-    const user = req.user;
-    const token = jwt.sign({ id: user.uuid }, 'secret', { expiresIn: '2h' });
-    const refreshToken = req.refreshToken;
-    res.status(200).send({ message: 'Berhasil Login', token, refreshToken });
+app.use(passport.initialize());
+app.use(passport.session());
+
+const initializePassport = require("../config/passportConfig");
+
+initializePassport(passport);
+
+const revokedTokens = new Set(); // In-memory token blacklist
+
+const isTokenRevoked = (token) => {
+    return revokedTokens.has(token); // Check if the token is in the blacklist
+};
+
+const { verifyToken } = require('../controller/authController');
+
+let currentAccessToken;
+let currentRefreshToken;
+
+router.post("/login", (req, res, next) => {
+    passport.authenticate('local', (err, user, info) => {
+        if (err) {
+            return res.status(500).send({ message: 'Internal server error' });
+        }
+        if (!user) {
+            return res.status(401).send({ message: info.message });
+        }
+
+        req.login(user, { session: false }, (err) => {
+            if (err) {
+                return res.status(500).send({ message: 'Internal server error' });
+            }
+
+            const accessToken = jwt.sign({ id: user.uuid }, 'secret', { expiresIn: '2h' });
+            const refreshToken = jwt.sign({ id: user.uuid }, 'refreshSecret', { expiresIn: '7d' });
+
+            currentAccessToken = accessToken;
+            currentRefreshToken = refreshToken;
+
+            res.status(200).send({ message: 'Berhasil Login', accessToken, refreshToken });
+        });
+    })(req, res, next);
 });
 
-router.post("/refresh-token", (req, res) => {
-    const { refreshToken } = req.body;
+router.post('/logout', verifyToken, (req, res) => {
+    const { token } = req.body;
 
-    // Validate the refresh token against your stored tokens in the database or secure storage
-    // Here, we're just checking if the received token matches the previously generated refresh token
-    if (refreshToken !== req.refreshToken) {
-        return res.status(403).send({ message: 'Invalid refresh token' });
+    if (!token && !currentAccessToken) {
+        return res.status(400).send({ message: 'Access token not provided' });
     }
 
-    // Generate a new access token
-    const accessToken = jwt.sign({ id: req.user }, 'secret', { expiresIn: '2h' });
+    const tokenToRevoke = token || currentAccessToken; // Use the token from the request body if provided, otherwise use the stored access token
 
-    res.status(200).send({ token: accessToken });
+    revokedTokens.add(tokenToRevoke);
+    revokedTokens.add(currentRefreshToken); // Also revoke the refresh token
+
+    currentAccessToken = null; // Clear the stored tokens
+    currentRefreshToken = null;
+
+    res.status(200).send({ message: 'Tokens revoked successfully' });
 });
 
 router.get("/user", verifyToken, (req, res) => {
     const userId = req.userId;
+
+    if (isTokenRevoked(req.headers.authorization) || !currentAccessToken) {
+        return res.status(401).send({ message: "Unauthorized - Token has been revoked or user is not logged in" });
+    }
+
     pool.query(
         `SELECT name, email FROM users WHERE uuid = $1`,
         [userId],
@@ -64,6 +105,7 @@ router.get("/user", verifyToken, (req, res) => {
     );
 });
 
+
 router.post("/register", async (req, res) => {
     let {
         name,
@@ -71,12 +113,6 @@ router.post("/register", async (req, res) => {
         password,
         password2
     } = req.body;
-    /*console.log({
-        name,
-        email,
-        password,
-        password2
-    });*/
 
     let errors = [];
 
@@ -139,23 +175,6 @@ router.post("/register", async (req, res) => {
     }
 });
 
-router.post("/logout", (req, res) => {
-    if (!req.user) {
-        res.status(401).send({ message: 'Unauthorized' });
-        return;
-    }
-    req.logOut(() => {
-        const token = req.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            return res.status(401).send({ message: 'No token provided' });
-        }
-
-        // Revoke the access token by adding it to the blacklist
-        revokedTokens.add(token);
-
-        res.status(200).send({ message: 'Successfully logged out' });
-    });
-});
 
 router.post("/check-email", (req, res) => {
     const { email } = req.body;

@@ -2,14 +2,15 @@ const express = require('express')
 const app = express()
 const passport = require("passport");
 const session = require('express-session');
+const jwt = require('jsonwebtoken'); 
 const store = session.MemoryStore();
-const initializePassport = require("../config/passportConfig");
 
 
-initializePassport(passport);
 
 app.use(passport.initialize());
 app.use(passport.session());
+const initializePassport = require("../config/passportConfig");
+initializePassport(passport);
 
 const revokedTokens = new Set(); // In-memory token blacklist
 
@@ -48,4 +49,4 @@ const verifyToken = (req, res, next) => {
 };
 
 
-module.exports = {verifyToken}
+module.exports = {verifyToken, revokedTokens, isTokenRevoked}

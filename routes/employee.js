@@ -1,11 +1,8 @@
 const express = require('express');
-const app = express();
 const router = express.Router()
 const { pool } = require("../database/dbConfig");
 
-const PORT = process.env.PORT || 4000;
-
-app.use(express.json());
+router.use(express.json());
 // app.use(express.urlencoded({ extended: true }));
 
 // Menangani permintaan GET pada root URL
@@ -13,7 +10,7 @@ app.use(express.json());
   res.send('Hello, world!');
 });*/
 // Menangani permintaan GET pada URL /api/employees
-router.get('/employees', (req, res) => {
+router.get('/api/employees', (req, res) => {
   const { name, divisi } = req.query;
   let query = 'SELECT * FROM employees';
 
@@ -54,7 +51,7 @@ router.get('/employees', (req, res) => {
   res.send('Data ditambahkan melalui API POST');
 });*/
 
-router.post('/employees', (req, res) => {
+router.post('/api/employees', (req, res) => {
   let {
     name,
     position,
@@ -100,7 +97,7 @@ router.post('/employees', (req, res) => {
             res.status(400).json({ errors });
           } else {
             pool.query(
-              `INSERT INTO employees (name, position, divisi, wa, email, status, photo) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+              `INSERT INTO employees (name, position, divisi, wa, email, status, photo) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING uuid`,
               [name, position, divisi, wa, email, status, photo],
               (err, results) => {
                 if (err) {
@@ -109,7 +106,7 @@ router.post('/employees', (req, res) => {
                 } else {
                   const insertedId = results.rows[0].id;
                   pool.query(
-                    `SELECT * FROM employees WHERE id = $1`,
+                    `SELECT * FROM employees WHERE uuid = $1`,
                     [insertedId],
                     (err, results) => {
                       if (err) {
@@ -132,11 +129,11 @@ router.post('/employees', (req, res) => {
   }
 });
 
-router.delete('/employees/:id', (req, res) => {
+router.delete('/api/employees/:id', (req, res) => {
   const id = req.params.id;
 
   pool.query(
-    'DELETE FROM employees WHERE id = $1',
+    'DELETE FROM employees WHERE uuid = $1',
     [id],
     (err, results) => {
       if (err) {
