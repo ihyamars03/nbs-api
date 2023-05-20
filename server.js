@@ -1,6 +1,9 @@
 const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 4000;
+const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
+const { pool } = require("./database/dbConfig");
 
 app.use(express.json());
 
