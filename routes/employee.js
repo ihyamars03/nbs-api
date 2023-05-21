@@ -10,7 +10,7 @@ router.use(express.json());
   res.send('Hello, world!');
 });*/
 // Menangani permintaan GET pada URL /api/employees
-router.get('/api/employees', (req, res) => {
+router.get('/all', (req, res) => {
   const { name, divisi } = req.query;
   let query = 'SELECT * FROM employees';
 
@@ -51,7 +51,7 @@ router.get('/api/employees', (req, res) => {
   res.send('Data ditambahkan melalui API POST');
 });*/
 
-router.post('/api/employees', (req, res) => {
+router.post('/add', (req, res) => {
   let {
     name,
     position,
@@ -133,7 +133,7 @@ router.post('/api/employees', (req, res) => {
   }
 });
 
-router.delete('/api/employees/:id', (req, res) => {
+router.delete('/:id', (req, res) => {
   const id = req.params.id;
 
   pool.query(
