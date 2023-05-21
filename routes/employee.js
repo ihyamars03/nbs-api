@@ -58,68 +58,72 @@ router.post('/add', (req, res) => {
     position,
     divisi,
     wa,
-    email,
+    user_email,
     status,
     photo
   } = req.body;
+  console.log(req.body);
 
   let errors = [];
 
-  if (!name || !email) {
-    errors.push({ message: "Please enter name and email" });
+  if (!name || !user_email) {
+    errors.push({ message: "Mohon masukkan email dan password" });
   }
 
   if (errors.length > 0) {
     res.status(400).json({ errors });
   } else {
     pool.query(
-      'SELECT * FROM employees WHERE name = $1 OR email = $2',
-      [name, email],
+      'SELECT * FROM users WHERE email = $1',
+      [user_email],
       (err, results) => {
         if (err) {
           console.error('Error executing query', err);
           res.status(500).json({ error: 'Internal Server Error' });
         } else {
-          if (results.rows.length > 0) {
-            for (let row of results.rows) {
-              if (row.name === name && row.email === email) {
-                errors.push({ message: "Name and Email already exist" });
-                break;
-              }
-              if (row.name === name) {
-                errors.push({ message: "Name already exists" });
-                break;
-              }
-              if (row.email === email) {
-                errors.push({ message: "Email already exists" });
-                break;
-              }
-            }
+          if (results.rows.length === 0) {
+            errors.push({ message: "Email belum terdaftar" }); //Email does not exist in the users table
             res.status(400).json({ errors });
           } else {
             pool.query(
-              `INSERT INTO employees (name, position, divisi, wa, email, status, photo) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING uuid`,
-              [name, position, divisi, wa, email, status, photo],
+              'SELECT * FROM employees WHERE user_email = $1',
+              [user_email],
               (err, results) => {
                 if (err) {
                   console.error('Error executing query', err);
                   res.status(500).json({ error: 'Internal Server Error' });
                 } else {
-                  const insertedId = results.rows[0].id;
-                  pool.query(
-                    `SELECT * FROM employees WHERE uuid = $1`,
-                    [insertedId],
-                    (err, results) => {
-                      if (err) {
-                        console.error('Error executing query', err);
-                        res.status(500).json({ error: 'Internal Server Error' });
-                      } else {
-                        const insertedEmployee = results.rows[0];
-                        res.json({ message: "Successfully registered user", data: insertedEmployee });
-                        console.log(insertedEmployee);
+                  if (results.rows.length > 0) {
+                    errors.push({ message: "Seorang karyawan sudah memakai email" });
+                    res.status(400).json({ errors });
+                  } else {
+                    pool.query(
+                      `INSERT INTO employees (name, position, divisi, wa, user_email, status, photo) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING uuid`,
+                      [name, position, divisi, wa, user_email, status, photo],
+                      (err, results) => {
+                        if (err) {
+                          console.error('Error executing query', err);
+                          res.status(500).json({ error: 'Internal Server Error' });
+                        } else {
+                          const insertedId = results.rows[0].uuid;
+                          pool.query(
+                            `SELECT * FROM employees WHERE uuid = $1`,
+                            [insertedId],
+                            (err, results) => {
+                              if (err) {
+                                console.error('Error executing query', err);
+                                res.status(500).json({ error: 'Internal Server Error' });
+                              } else {
+                                const insertedEmployee = results.rows[0];
+                                res.json({ message: "Berhasil menambahkan karyawan", data: insertedEmployee });
+                                console.log(insertedEmployee);
+                              }
+                            }
+                          );
+                        }
                       }
-                    }
-                  );
+                    );
+                  }
                 }
               }
             );

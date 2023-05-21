@@ -4,7 +4,7 @@ const { pool } = require("../database/dbConfig");
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const session = require('express-session');
-const jwt = require('jsonwebtoken'); 
+const jwt = require('jsonwebtoken');
 const passport = require("passport");
 const pgSession = require('connect-pg-simple')(session);
 
@@ -13,7 +13,7 @@ app.use(session({
     secret: 'secret',
     resave: false,
     saveUninitialized: false,
-    cookie: false, 
+    cookie: false,
     store: new pgSession({
         pool,
         tableName: 'sessions',
@@ -58,10 +58,40 @@ router.post("/login", (req, res, next) => {
             currentAccessToken = accessToken;
             currentRefreshToken = refreshToken;
 
-            res.status(200).send({ message: 'Berhasil Login', accessToken, refreshToken });
+            // Fetch the employee associated with the logged-in user
+            pool.query(
+                `SELECT * FROM employees WHERE user_email = $1`,
+                [user.email],
+                (err, results) => {
+                    if (err) {
+                        throw err;
+                    }
+                    const employee = results.rows[0];
+
+                    if (!employee) {
+                        return res.status(404).send({ message: "Anda tidak terdaftar, silahkan hubungi HRD" });
+                    }
+
+                    res.status(200).send({
+                        message: 'Berhasil Login',
+                        // employee: {
+                        //     name: employee.name,
+                        //     position: employee.position,
+                        //     divisi: employee.divisi,
+                        //     wa: employee.wa,
+                        //     user_email: employee.user_email,
+                        //     status: employee.status,
+                        //     photo: employee.photo
+                        // },
+                        accessToken,
+                        refreshToken,
+                    });
+                }
+            );
         });
     })(req, res, next);
 });
+
 
 router.post('/logout', verifyToken, (req, res) => {
     const { token } = req.body;
@@ -78,32 +108,39 @@ router.post('/logout', verifyToken, (req, res) => {
     currentAccessToken = null; // Clear the stored tokens
     currentRefreshToken = null;
 
-    res.status(200).send({ message: 'Tokens revoked successfully' });
+    res.status(200).send({ message: 'Anda berhasil logout' }); //token revoked successfully
 });
 
 router.get("/user", verifyToken, (req, res) => {
-    const userId = req.userId;
+  const userId = req.userId;
 
-    if (isTokenRevoked(req.headers.authorization) || !currentAccessToken) {
-        return res.status(401).send({ message: "Unauthorized - Token has been revoked or user is not logged in" });
+  if (isTokenRevoked(req.headers.authorization) || !currentAccessToken) {
+    return res.status(401).send({ message: "Anda belum login" });  //unauthorized
+  }
+
+  pool.query(
+    `SELECT users.name AS user_name, users.email, employees.name AS employee_name, employees.position, employees.divisi, employees.wa, employees.status, employees.photo
+     FROM users
+     LEFT JOIN employees ON users.email = employees.user_email
+     WHERE users.uuid = $1`,
+    [userId],
+    (err, results) => {
+      if (err) {
+        throw err;
+      }
+
+      const user = results.rows[0];
+
+      if (!user) {
+        res.status(404).send({ message: "User tidak ditemukan" });
+      } else {
+        res.status(200).send(user);
+      }
     }
-
-    pool.query(
-        `SELECT name, email FROM users WHERE uuid = $1`,
-        [userId],
-        (err, results) => {
-            if (err) {
-                throw err;
-            }
-            const user = results.rows[0];
-            if (!user) {
-                res.status(404).send({ message: "User not found" });
-            } else {
-                res.status(200).send(user);
-            }
-        }
-    );
+  );
 });
+
+
 
 
 router.post("/register", async (req, res) => {
@@ -121,11 +158,11 @@ router.post("/register", async (req, res) => {
     }
 
     if (password && password.length < 6) {
-        errors.push({ message: "Password should be at least 6 characters" });
+        errors.push({ message: "PIN harus 6 karakter" });
     }
 
     if (password != password2) {
-        errors.push({ message: "Passwords do not match" })
+        errors.push({ message: "Kamu salah menginput PIN sebelumnya, silahkan input ulang PIN" })
     }
 
     if (errors.length > 0) {
@@ -145,7 +182,7 @@ router.post("/register", async (req, res) => {
                 //console.log(results.rows);
 
                 if (results.rows.length > 0) {
-                    errors.push({ message: "Email already registered" });
+                    errors.push({ message: "Email sudah terdaftar" });
                     res.status(400).json({ errors });
                 } else {
                     pool.query(
@@ -160,7 +197,7 @@ router.post("/register", async (req, res) => {
                             if (err) {
                                 throw err
                             }
-                            res.send({ message: "Successfully registered user" });
+                            res.send({ message: "Berhasil mendaftarkan user" });
                             //console.log(results.rows);
                         }
                     )
