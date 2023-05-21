@@ -1,13 +1,13 @@
 const {sequelize, DataTypes} = require('../database/dbConfig')
 
-const Attendance = sequelize.define('Attendance', {
-    id: {
+const Attendance = sequelize.define('attendance', {
+    attend_id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true
     },
-    employee_id: {
-      type: DataTypes.INTEGER,
+    uuid: {
+      type: DataTypes.UUID,
       allowNull: false
     },
     attendance_date: {
@@ -32,4 +32,4 @@ const Attendance = sequelize.define('Attendance', {
 
   });
 
-  module.exports = Attendance
+  module.exports = {Attendance}

@@ -1,83 +1,101 @@
 const express = require('express')
 const router = express.Router()
-const {Attendance} = require('../model/attendModel')
+const moment = require('moment');
+const Multer = require('multer');
+const { Attendance } = require('../model/attendModel')
+const {uploadImage} = require('../controller/storageController')
 
+const multer = Multer({
+  storage: Multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // Batasan ukuran file (5MB)
+  },
+});
 
-// Endpoint untuk mengunggah file
-router.post('/clockin:employeeId', async (req, res) => {
- try {
-  const dateObject = new Date();
-  const {employeeId} = req.body
-
-  let date = ("0" + dateObject.getDate()).slice(-2);
-  let month = ("0" + (dateObject.getMonth() + 1)).slice(-2);
-  let year = dateObject.getFullYear();
-
-  let hours = dateObject.getHours(); 
-  let minutes = dateObject.getMinutes() > 9 ? dateObject.getMinutes() : '0'+dateObject.getMinutes();
-
+router.post('/clockin/:uuid', multer.single('file'), async (req, res) => {
   
-  let fraud = true
+  try {
+    const {uuid} = req.params
+    const {file} = req.file
+
+    uploadImage(file)
+    
+    const currentTime = moment().format('HH:mm');
+    
+    const fraud = true
+    
+    if (!fraud) { res.status(400).json({message: 'Gambar bukan berupa wajah'})}
+    
+    const existingAttendance = await Attendance.findOne({
+      where: {
+        uuid,
+        clockout_time: '00:00',
+      },
+    });
+
+    if (existingAttendance) {
+      return res.status(400).json({ error: 'Already clocked in' });
+    }
+
+    let status = parseInt(currentTime.split(':')[0]) <= 8 ? 'ontime' : 'late'
   
-  if (!fraud) { res.status(400).json({message: 'Gambar bukan berupa wajah'})}
+    const newAttendance = await Attendance.create({
+      uuid: uuid,
+      attendance_date: Date.now(),
+      clockin_time: currentTime,
+      clockout_time: '00:00',
+      status: status
+    });
+   
+    res.status(200).json({message:'Berhasil Presensi', data: newAttendance})
 
-  
-  const attendance = await Attendance.create({
-    employee_id: employeeId,
-    attendance_date: `${date}/${month}/${year}`,
-    clockin_time: `${hours}:${minutes}`,
-    clockout_time: "00:00",
-    status: parseInt(clockin_time.split(':')[0]) <= 8 ? 'ontime' : 'late'
-  });
-
-  res.status(200).json(attendance)
-
- } catch (error) {
-  res.status(500).json({ message: 'Internal server error', error: error });
+ } catch (err) {
+  console.log(err);
+  res.status(500).json({message: 'Internal Server Error'})
  }
   
 });
 
-router.put('/clockout:employeeId', async (req, res) => {
+router.put('/clockout/:uuid', async (req, res) => {
   try {
-    const dateObject = new Date();
-    let hours = dateObject.getHours(); 
-    let minutes = dateObject.getMinutes() > 9 ? dateObject.getMinutes() : '0'+dateObject.getMinutes();
+    const currentTime = moment().format('HH:mm');
+    const {uuid} = req.params;
 
-    const {employeeId} = req.body;
-    const attendance = await Attendance.findAll(
-      {
-        where: {
-          employeeId: employeeId
-        }
-      }
-    );
-
+    const attendance = await Attendance.findOne({
+      where: {
+        uuid,
+        clockout_time: '00:00',
+      },
+    });
     if (!attendance) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(400).json({ error: 'No active clock-in found' });
     }
-    attendance.clockout_time = `${hours}:${minutes}`;
+
+
+    attendance.clockout_time = currentTime;
     await attendance.save();
 
     res.status(200).json(attendance);
   } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
+    console.log(err);
+    res.status(500).json({message: 'Internal Server Error'})
   }
 });
 
-router.get('/history:employeeId', async (res,req) => {
+router.get('/history/:uuid', async (req, res) => {
   try {
-    const {employeeId} = req.body;
+    const {uuid} = req.params;
     const attendance = await Attendance.findAll(
       {
         where: {
-          employeeId: employeeId
+          uuid: uuid
         }
       }
     );
     res.status(200).json(attendance)
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    console.log(err);
+    res.status(500).json({message: 'Internal Server Error'})
   }
 })
 
