@@ -155,4 +155,27 @@ router.delete('/:id', (req, res) => {
   );
 });
 
+router.get('/:id', (req, res) => {
+  const id = req.params.id;
+
+  pool.query(
+    'SELECT * FROM employees WHERE uuid = $1',
+    [id],
+    (err, results) => {
+      if (err) {
+        console.error('Error executing query', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+      } else {
+        if (results.rows.length === 0) {
+          res.status(404).json({ error: 'Employee not found' });
+        } else {
+          const employee = results.rows[0];
+          res.json(employee);
+          console.log(employee);
+        }
+      }
+    }
+  );
+})
+
 module.exports = router
