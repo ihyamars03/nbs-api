@@ -1,9 +1,8 @@
 const express = require('express');
-const app = express();
+const router = express.Router()
 const { pool } = require("../database/dbConfig");
-const router = express.Router();
 
-app.use(express.json());
+router.use(express.json());
 // app.use(express.urlencoded({ extended: true }));
 
 // Menangani permintaan GET pada root URL
@@ -11,7 +10,7 @@ app.use(express.json());
   res.send('Hello, world!');
 });*/
 // Menangani permintaan GET pada URL /api/employees
-router.get('/all', (req, res) => {
+router.get('/api/employees', (req, res) => {
   const { name, divisi } = req.query;
   let query = 'SELECT * FROM employees';
 
@@ -52,7 +51,7 @@ router.get('/all', (req, res) => {
   res.send('Data ditambahkan melalui API POST');
 });*/
 
-router.post('/add', (req, res) => {
+router.post('/api/employees', (req, res) => {
   let {
     name,
     position,
@@ -134,7 +133,7 @@ router.post('/add', (req, res) => {
   }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/api/employees/:id', (req, res) => {
   const id = req.params.id;
 
   pool.query(
