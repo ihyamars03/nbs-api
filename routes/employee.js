@@ -9,6 +9,7 @@ router.use(express.json());
 /*app.get('/', (req, res) => {
   res.send('Hello, world!');
 });*/
+
 // Menangani permintaan GET pada URL /api/employees
 router.get('/all', (req, res) => {
   const { name, divisi } = req.query;
