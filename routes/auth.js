@@ -119,9 +119,10 @@ router.get("/user", verifyToken, (req, res) => {
   }
 
   pool.query(
-    `SELECT users.name AS user_name, users.email, employees.name AS employee_name, employees.position, employees.divisi, employees.wa, employees.status, employees.photo
+    `SELECT users.name AS user_name, users.email, employees.name AS employee_name, employees.position, employees.divisi, employees.wa, employees.status, employees.photo, attendances.clockin_time, attendances.clockout_time
      FROM users
-     LEFT JOIN employees ON users.email = employees.user_email
+     LEFT JOIN employees ON users.email = employees.user_email 
+     LEFT JOIN attendances ON employees.uuid = attendances.uuid
      WHERE users.uuid = $1`,
     [userId],
     (err, results) => {
@@ -235,4 +236,4 @@ router.post("/check-email", (req, res) => {
     );
 });
 
-module.exports = router
+module.exports = {router, currentAccessToken, currentRefreshToken}

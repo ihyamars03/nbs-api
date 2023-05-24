@@ -10,7 +10,7 @@ const Attendance = sequelize.define('attendance', {
       type: DataTypes.UUID,
       allowNull: false
     },
-    attendance_date: {
+    date: {
       type: DataTypes.DATE,
       allowNull: false
     },

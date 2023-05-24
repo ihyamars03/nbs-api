@@ -6,12 +6,12 @@ app.use(express.json());
 
 
 //import routes
-const authRoutes = require('./routes/auth')
+const {router} = require('./routes/auth')
 const attendRoutes = require('./routes/attend')
 const employeeRoutes = require('./routes/employee')
 
 //Routes
-app.use("/api/v1/auth", authRoutes)
+app.use("/api/v1/auth", router)
 app.use("/api/v1/attend", attendRoutes)
 app.use("/api/v1/employees", employeeRoutes)
 

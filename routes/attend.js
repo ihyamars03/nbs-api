@@ -4,7 +4,25 @@ const moment = require('moment');
 const Multer = require('multer');
 const { Attendance } = require('../model/attendModel')
 const { Storage } = require('@google-cloud/storage');
+const { verifyToken } = require('../controller/authController');
+const {currentAccessToken, currentRefreshToken} = require('./auth')
+const { pool } = require("../database/dbConfig");
 
+async function getUUID(userId) {
+  try {
+    const results = await pool.query(
+      `SELECT employees.uuid
+       FROM users
+       LEFT JOIN employees ON users.email = employees.user_email 
+       WHERE users.uuid = $1`,
+      [userId]
+    );
+    const uuid = results.rows[0].uuid;
+    return uuid;
+  } catch (err) {
+    throw err;
+  }
+}
 
 const storage = new Storage({
   projectId: 'nbs-company-386604',
@@ -19,10 +37,18 @@ const multer = Multer({
   },
 });
 
-router.post('/clockin/:uuid', multer.single('file'), async (req, res) => {
+router.post('/clockin', verifyToken, multer.single('file'), async (req, res) => {
   
   try {
-    const {uuid} = req.params
+    
+    const userId = req.userId;
+    const uuid = await getUUID(userId)
+
+    if (!userId) {
+        return res.status(400).send({ message: 'Access token not provided' });
+    }
+    
+    
     const file = req.file;
 
     if (!file) {
@@ -58,9 +84,13 @@ router.post('/clockin/:uuid', multer.single('file'), async (req, res) => {
     
     if (!fraud) { res.status(400).json({message: 'Gambar bukan berupa wajah'})}
     
+       
+
+    console.log(uuid);
+
     const existingAttendance = await Attendance.findOne({
       where: {
-        uuid,
+        uuid: uuid,
         clockout_time: '00:00',
       },
     });
@@ -73,7 +103,7 @@ router.post('/clockin/:uuid', multer.single('file'), async (req, res) => {
   
     const newAttendance = await Attendance.create({
       uuid: uuid,
-      attendance_date: Date.now(),
+      date: Date.now(),
       clockin_time: currentTime,
       clockout_time: '00:00',
       status: status
@@ -88,10 +118,16 @@ router.post('/clockin/:uuid', multer.single('file'), async (req, res) => {
   
 });
 
-router.put('/clockout/:uuid', async (req, res) => {
+router.put('/clockout',verifyToken, async (req, res) => {
   try {
+    const userId = req.userId;
+    const uuid = await getUUID(userId)
+
+    if (!userId) {
+      return res.status(400).send({ message: 'Access token not provided' });
+  }
+
     const currentTime = moment().format('HH:mm');
-    const {uuid} = req.params;
 
     const attendance = await Attendance.findOne({
       where: {
@@ -114,9 +150,15 @@ router.put('/clockout/:uuid', async (req, res) => {
   }
 });
 
-router.get('/history/:uuid', async (req, res) => {
+router.get('/history', verifyToken, async (req, res) => {
   try {
-    const {uuid} = req.params;
+    const userId = req.userId;
+    const uuid = await getUUID(userId)
+
+    if (!userId) {
+      return res.status(400).send({ message: 'Access token not provided' });
+  }
+
     const attendance = await Attendance.findAll(
       {
         where: {
