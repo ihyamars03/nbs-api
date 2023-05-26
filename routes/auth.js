@@ -9,7 +9,7 @@ const passport = require("passport");
 const pgSession = require('connect-pg-simple')(session);
 const scheduleReset = require('../controller/resetDate')
 const moment = require('moment');
-const cron = require('node-cron');
+
 
 async function getUUID(userId) {
     try {
