@@ -43,12 +43,27 @@ router.post('/clockin', verifyToken, multer.single('file'), async (req, res) => 
     
     const userId = req.userId;
     const uuid = await getUUID(userId)
+    const token = req.get('Authorization');
+    const today = moment().toDate('YY-MM-DD');
+    const currentTime = moment().format('HH:mm');
+    const status = parseInt(currentTime.split(':')[0]) < 8 ? 'ontime' : 'late'
+   
 
-    if (!userId) {
+    if (!token && !userId) {
         return res.status(400).send({ message: 'Access token not provided' });
     }
-    
-    
+
+    const existingAttendance = await Attendance.findOne({
+      where: {
+        uuid: uuid,
+        date: today,
+      },
+    });
+
+    if (existingAttendance) {
+      return res.status(400).json({ message: 'Already clocked in' });
+    }
+
     const file = req.file;
 
     if (!file) {
@@ -77,37 +92,28 @@ router.post('/clockin', verifyToken, multer.single('file'), async (req, res) => 
     // });
 
     blobStream.end(file.buffer);
-
-    const currentTime = moment().format('HH:mm');
     
     const fraud = true
     
     if (!fraud) { res.status(400).json({message: 'Gambar bukan berupa wajah'})}
     
-       
-
-    console.log(uuid);
-
-    const existingAttendance = await Attendance.findOne({
+    const newAttendance = await Attendance.findOne({
       where: {
         uuid: uuid,
-        clockout_time: '00:00',
+        date: today,
+        clockin_time: null,
       },
     });
 
-    if (existingAttendance) {
-      return res.status(400).json({ error: 'Already clocked in' });
-    }
+    newAttendance.clockin_time = currentTime
+    newAttendance.status = status
+    await newAttendance.save()
 
-    let status = parseInt(currentTime.split(':')[0]) <= 8 ? 'ontime' : 'late'
+    
+    
+
+    
   
-    const newAttendance = await Attendance.create({
-      uuid: uuid,
-      date: Date.now(),
-      clockin_time: currentTime,
-      clockout_time: '00:00',
-      status: status
-    });
    
     res.status(200).json({message:'Berhasil Presensi', data: newAttendance})
 
@@ -122,6 +128,7 @@ router.put('/clockout',verifyToken, async (req, res) => {
   try {
     const userId = req.userId;
     const uuid = await getUUID(userId)
+    const today = moment().toDate('YY-MM-DD');
 
     if (!userId) {
       return res.status(400).send({ message: 'Access token not provided' });
@@ -131,8 +138,9 @@ router.put('/clockout',verifyToken, async (req, res) => {
 
     const attendance = await Attendance.findOne({
       where: {
-        uuid,
-        clockout_time: '00:00',
+        uuid: uuid,
+        date: today,
+        clockout_time: null,
       },
     });
     if (!attendance) {

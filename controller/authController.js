@@ -49,4 +49,4 @@ const verifyToken = (req, res, next) => {
 };
 
 
-module.exports = {verifyToken, revokedTokens, isTokenRevoked}
+module.exports = {verifyToken, isTokenRevoked}

@@ -16,15 +16,15 @@ const Attendance = sequelize.define('attendance', {
     },
     clockin_time: {
       type: DataTypes.TIME,
-      allowNull: false
+      allowNull: true
     },
     clockout_time: {
       type: DataTypes.TIME,
-      allowNull: false
+      allowNull: true
     },
     status: {
       type: DataTypes.STRING(10),
-      allowNull: false,
+      allowNull: true,
       validate: {
         isIn: [['late', 'ontime']]
       }

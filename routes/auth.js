@@ -7,6 +7,25 @@ const session = require('express-session');
 const jwt = require('jsonwebtoken');
 const passport = require("passport");
 const pgSession = require('connect-pg-simple')(session);
+const scheduleReset = require('../controller/resetDate')
+const moment = require('moment');
+const cron = require('node-cron');
+
+async function getUUID(userId) {
+    try {
+      const results = await pool.query(
+        `SELECT employees.uuid
+         FROM users
+         LEFT JOIN employees ON users.email = employees.user_email 
+         WHERE users.uuid = $1`,
+        [userId]
+      );
+      const uuid = results.rows[0].uuid;
+      return uuid;
+    } catch (err) {
+      throw err;
+    }
+  }
 
 // middleware
 app.use(session({
@@ -35,8 +54,9 @@ const isTokenRevoked = (token) => {
 
 const { verifyToken } = require('../controller/authController');
 
-let currentAccessToken;
-let currentRefreshToken;
+currentAccessToken = null;
+currentRefreshToken = null;
+
 
 router.post("/login", (req, res, next) => {
     passport.authenticate('local', (err, user, info) => {
@@ -58,6 +78,7 @@ router.post("/login", (req, res, next) => {
             currentAccessToken = accessToken;
             currentRefreshToken = refreshToken;
 
+            
             // Fetch the employee associated with the logged-in user
             pool.query(
                 `SELECT * FROM employees WHERE user_email = $1`,
@@ -94,7 +115,7 @@ router.post("/login", (req, res, next) => {
 
 
 router.post('/logout', verifyToken, (req, res) => {
-    const { token } = req.body;
+    const token = req.get('Authorization');
 
     if (!token && !currentAccessToken) {
         return res.status(400).send({ message: 'Access token not provided' });
@@ -111,30 +132,39 @@ router.post('/logout', verifyToken, (req, res) => {
     res.status(200).send({ message: 'Anda berhasil logout' }); //token revoked successfully
 });
 
-router.get("/user", verifyToken, (req, res) => {
+router.get("/user", verifyToken, async (req, res) => {
   const userId = req.userId;
+  const uuid = await getUUID(userId)
+  const today = moment().toDate('YY-MM-DD');
 
+  await scheduleReset(uuid);
+
+  
   if (isTokenRevoked(req.headers.authorization) || !currentAccessToken) {
     return res.status(401).send({ message: "Anda belum login" });  //unauthorized
   }
-
+  
   pool.query(
     `SELECT users.name AS user_name, users.email, employees.name AS employee_name, employees.position, employees.divisi, employees.wa, employees.status, employees.photo, attendances.clockin_time, attendances.clockout_time
      FROM users
      LEFT JOIN employees ON users.email = employees.user_email 
      LEFT JOIN attendances ON employees.uuid = attendances.uuid
-     WHERE users.uuid = $1`,
-    [userId],
+     WHERE users.uuid = $1 AND attendances.date = $2`,
+    [userId, today],
     (err, results) => {
       if (err) {
         throw err;
       }
+      
+      const userFromDB = results.rows[0];
 
-      const user = results.rows[0];
-
-      if (!user) {
+      if (!userFromDB) {
         res.status(404).send({ message: "User tidak ditemukan" });
       } else {
+        const user = {
+            ...userFromDB,
+            date: today
+        };
         res.status(200).send(user);
       }
     }
